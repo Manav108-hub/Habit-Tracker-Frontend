@@ -1,5 +1,4 @@
-// lib/api.ts - Token-based API client for production
-
+// lib/api.ts - Pure localStorage + Authorization header approach
 import type {
   User,
   Habit,
@@ -23,8 +22,7 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
-// Token management
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// Token management - localStorage only
 const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('access_token');
@@ -53,25 +51,21 @@ class APIException extends Error {
 }
 
 // Generic API request handler
-// Generic API request handler
-// Generic API request handler
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  // Build headers with proper typing
+  // Build headers
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
-  // Add token if it exists - read directly at fetch time
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+  // Add Authorization header if token exists
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   // Merge with any headers from options
@@ -83,6 +77,7 @@ async function apiRequest<T>(
   const config: RequestInit = {
     ...options,
     headers: finalHeaders,
+    // NO credentials: 'include' - we're using Authorization headers
   };
 
   try {
@@ -110,6 +105,7 @@ async function apiRequest<T>(
     throw new Error('Network error or server unavailable');
   }
 }
+
 // Authentication APIs
 export const authAPI = {
   signup: (data: SignupRequest): Promise<MessageResponse> =>
@@ -119,40 +115,26 @@ export const authAPI = {
     }),
 
   login: async (data: LoginRequest): Promise<{ message: string; user: unknown }> => {
-  const response = await fetch(`${API_BASE_URL}/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-    // ❌ REMOVE credentials: 'include' - we're using Authorization headers
-  });
+    const response = await apiRequest<{
+      message: string;
+      access_token: string;
+      token_type: string;
+      user: unknown;
+    }>('/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new APIException(response.status, error.detail || 'Login failed');
-  }
+    // Store token in localStorage
+    if (response.access_token) {
+      setToken(response.access_token);
+    }
 
-  const result = await response.json();
-  console.log('Login response:', result); // Debug log
-  
-  // ✅ CRITICAL: Store the token in localStorage
-  if (result.access_token) {
-    console.log('Storing token in localStorage');
-    setToken(result.access_token);
-    
-    // Verify storage
-    const verifyToken = localStorage.getItem('access_token');
-    console.log('Token verification:', verifyToken ? 'STORED' : 'MISSING');
-  } else {
-    console.error('No access_token in response!');
-  }
-
-  return {
-    message: result.message,
-    user: result.user,
-  };
-},
+    return {
+      message: response.message,
+      user: response.user,
+    };
+  },
 
   logout: (): void => {
     removeToken();
