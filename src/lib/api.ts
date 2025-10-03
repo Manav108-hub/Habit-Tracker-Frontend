@@ -24,6 +24,7 @@ import type {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 // Token management
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('access_token');
@@ -53,31 +54,35 @@ class APIException extends Error {
 
 // Generic API request handler
 // Generic API request handler
+// Generic API request handler
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  const defaultHeaders: HeadersInit = {
+  // Build headers with proper typing
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
-  // Get token inside the request (not before)
-  // This ensures it runs client-side during the actual fetch
+  // Add token if it exists - read directly at fetch time
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token');
     if (token) {
-      defaultHeaders['Authorization'] = `Bearer ${token}`;
+      headers['Authorization'] = `Bearer ${token}`;
     }
   }
 
+  // Merge with any headers from options
+  const finalHeaders = {
+    ...headers,
+    ...(options.headers as Record<string, string>),
+  };
+
   const config: RequestInit = {
     ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
+    headers: finalHeaders,
   };
 
   try {
@@ -105,7 +110,6 @@ async function apiRequest<T>(
     throw new Error('Network error or server unavailable');
   }
 }
-
 // Authentication APIs
 export const authAPI = {
   signup: (data: SignupRequest): Promise<MessageResponse> =>
