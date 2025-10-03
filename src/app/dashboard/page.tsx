@@ -46,7 +46,7 @@ export default function DashboardPage() {
     <div>
       <div className="dashboard-header">
         <h1 className="dashboard-title">Dashboard</h1>
-        <p className="dashboard-subtitle">Welcome back! Here's your progress overview.</p>
+        <p className="dashboard-subtitle">Welcome back! Here&apos;s your progress overview.</p>
       </div>
 
       {/* Stats Grid */}
@@ -79,7 +79,7 @@ export default function DashboardPage() {
 
         <div className="stat-card">
           <div className="stat-card-header">
-            <span className="stat-card-title">Today's Progress</span>
+            <span className="stat-card-title">Today&apos;s Progress</span>
             <div className="stat-card-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
