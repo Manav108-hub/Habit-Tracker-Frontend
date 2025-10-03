@@ -138,35 +138,42 @@ export const authAPI = {
       body: JSON.stringify(data),
     }),
 
-  login: async (data: LoginRequest): Promise<{ message: string; user: unknown }> => {
-    console.log('🔐 Starting login process...');
-    const response = await apiRequest<{
-      message: string;
-      access_token: string;
-      token_type: string;
-      user: unknown;
-    }>('/login', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  // In your authAPI login function
+login: async (data: LoginRequest): Promise<{ message: string; user: unknown }> => {
+  console.log('🔐 Starting login process...');
+  
+  // ✅ CRITICAL: Clear any existing token before login
+  removeToken();
+  console.log('🧹 Cleared any existing token');
+  
+  const response = await apiRequest<{
+    message: string;
+    access_token: string;
+    token_type: string;
+    user: unknown;
+  }>('/login', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 
-    // Store token in localStorage
-    if (response.access_token) {
-      console.log('✅ Login successful, storing token...');
-      setToken(response.access_token);
-      
-      // Verify token was stored
-      const verifyToken = localStorage.getItem('access_token');
-      console.log('🔍 Token storage verification:', verifyToken ? 'SUCCESS' : 'FAILED');
-    } else {
-      console.error('❌ No access_token in login response!');
-    }
+  // Store the NEW token from response
+  if (response.access_token) {
+    console.log('✅ Login successful, storing NEW token...');
+    setToken(response.access_token);
+    
+    // Verify token was stored
+    const verifyToken = localStorage.getItem('access_token');
+    console.log('🔍 Token storage verification:', verifyToken ? 'SUCCESS' : 'FAILED');
+    console.log('🔍 Stored token preview:', verifyToken ? `Bearer ${verifyToken.substring(0, 20)}...` : 'MISSING');
+  } else {
+    console.error('❌ No access_token in login response!');
+  }
 
-    return {
-      message: response.message,
-      user: response.user,
-    };
-  },
+  return {
+    message: response.message,
+    user: response.user,
+  };
+},
 
   logout: (): void => {
     console.log('👋 Logging out...');
