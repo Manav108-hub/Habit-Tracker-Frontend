@@ -49,6 +49,7 @@ export default function AdminPanel() {
 
   useEffect(() => {
     checkAdminAccess();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkAdminAccess = async () => {
@@ -142,6 +143,7 @@ export default function AdminPanel() {
       } else {
         setMessage({ type: 'error', text: data.detail || 'Failed to send invitation' });
       }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to send invitation' });
     } finally {
@@ -164,6 +166,7 @@ export default function AdminPanel() {
       } else {
         setMessage({ type: 'error', text: 'Failed to revoke invitation' });
       }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to revoke invitation' });
     }
