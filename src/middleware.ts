@@ -1,11 +1,12 @@
-// middleware.ts - Protect admin routes
+// middleware.ts - Fixed for localStorage token auth
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Check if accessing admin routes
+  // Only protect admin routes with middleware
+  // Dashboard auth is handled client-side since we use localStorage
   if (pathname.startsWith('/admin')) {
     const accessToken = request.cookies.get('access_token');
 
@@ -19,7 +20,7 @@ export async function middleware(request: NextRequest) {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
       const response = await fetch(`${API_URL}/me`, {
         headers: {
-          Cookie: `access_token=${accessToken.value}`,
+          'Authorization': `Bearer ${accessToken.value}`,
         },
       });
 
@@ -42,17 +43,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // For dashboard routes, just check if authenticated
-  if (pathname.startsWith('/dashboard')) {
-    const accessToken = request.cookies.get('access_token');
-    if (!accessToken) {
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
-  }
-
+  // Don't check dashboard routes in middleware - localStorage isn't accessible here
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/dashboard/:path*'],
+  matcher: ['/admin/:path*'],  // Only protect admin routes
 };
