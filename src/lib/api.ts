@@ -52,20 +52,24 @@ class APIException extends Error {
 }
 
 // Generic API request handler
+// Generic API request handler
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  const token = getToken();
-
+  
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
   };
 
-  // Add Authorization header if token exists
-  if (token) {
-    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  // Get token inside the request (not before)
+  // This ensures it runs client-side during the actual fetch
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      defaultHeaders['Authorization'] = `Bearer ${token}`;
+    }
   }
 
   const config: RequestInit = {
