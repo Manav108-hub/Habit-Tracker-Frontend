@@ -32,6 +32,7 @@ const getToken = (): string | null => {
   return null;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const setToken = (token: string): void => {
   if (typeof window !== 'undefined') {
     localStorage.setItem('access_token', token);
@@ -119,28 +120,26 @@ export const authAPI = {
     }),
 
   login: async (data: LoginRequest): Promise<{ message: string; user: unknown }> => {
-    const response = await apiRequest<{
-      message: string;
-      access_token: string;
-      token_type: string;
-      user: unknown;
-    }>('/login', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  const response = await fetch(`${API_BASE_URL}/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+    credentials: 'include', // Important for cookies
+  });
 
-    // Store token and wait for localStorage to update
-    if (response.access_token) {
-      setToken(response.access_token);
-      // Small delay to ensure localStorage write completes
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+  if (!response.ok) {
+    const error = await response.json();
+    throw new APIException(response.status, error.detail || 'Login failed');
+  }
 
-    return {
-      message: response.message,
-      user: response.user,
-    };
-  },
+  const result = await response.json();
+  return {
+    message: result.message,
+    user: result.user,
+  };
+},
 
   logout: (): void => {
     removeToken();
