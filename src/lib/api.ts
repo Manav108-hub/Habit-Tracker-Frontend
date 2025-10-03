@@ -121,9 +121,11 @@ export const authAPI = {
       body: JSON.stringify(data),
     });
 
-    // Store token
+    // Store token and wait for localStorage to update
     if (response.access_token) {
       setToken(response.access_token);
+      // Small delay to ensure localStorage write completes
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     return {
