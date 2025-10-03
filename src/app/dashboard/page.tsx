@@ -1,20 +1,31 @@
-// src/app/dashboard/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { progressAPI, gamificationAPI, habitAPI } from '@/lib/api';
 import type { Progress, UserStats, Habit } from '@/lib/types';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [progress, setProgress] = useState<Progress | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [recentHabits, setRecentHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    // Check authentication first
+    const token = localStorage.getItem('access_token');
+    
+    if (!token) {
+      router.replace('/login');
+      return;
+    }
+    
+    setIsAuthenticated(true);
     loadDashboardData();
-  }, []);
+  }, [router]);
 
   const loadDashboardData = async () => {
     try {
@@ -34,7 +45,7 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) {
+  if (!isAuthenticated || loading) {
     return (
       <div className="flex-center" style={{ minHeight: '50vh' }}>
         <div className="spinner" style={{ width: '2rem', height: '2rem' }}></div>

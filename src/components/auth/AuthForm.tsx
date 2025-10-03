@@ -1,4 +1,3 @@
-// src/components/auth/AuthForm.tsx
 'use client';
 
 import { useState, FormEvent } from 'react';
@@ -19,30 +18,29 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  setError('');
-  setSuccess('');
-  setLoading(true);
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
 
-  try {
-    if (mode === 'login') {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const result = await authAPI.login({ email, password });
-      setSuccess('Login successful! Redirecting...');
-      // Token is now stored in localStorage by authAPI.login
-      setTimeout(() => router.push('/dashboard'), 500);
-    } else {
-      await authAPI.signup({ email, password });
-      setSuccess('Account created! Please login.');
-      setTimeout(() => router.push('/login'), 1500);
+    try {
+      if (mode === 'login') {
+        await authAPI.login({ email, password });
+        setSuccess('Login successful! Redirecting...');
+        // Immediate redirect
+        router.push('/dashboard');
+      } else {
+        await authAPI.signup({ email, password });
+        setSuccess('Account created! Please login.');
+        setTimeout(() => router.push('/login'), 1500);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="auth-container">
