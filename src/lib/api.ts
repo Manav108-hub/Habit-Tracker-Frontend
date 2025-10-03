@@ -32,7 +32,6 @@ const getToken = (): string | null => {
   return null;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const setToken = (token: string): void => {
   if (typeof window !== 'undefined') {
     localStorage.setItem('access_token', token);
@@ -126,7 +125,7 @@ export const authAPI = {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(data),
-    credentials: 'include', // Important for cookies
+    // ❌ REMOVE credentials: 'include' - we're using Authorization headers
   });
 
   if (!response.ok) {
@@ -135,6 +134,20 @@ export const authAPI = {
   }
 
   const result = await response.json();
+  console.log('Login response:', result); // Debug log
+  
+  // ✅ CRITICAL: Store the token in localStorage
+  if (result.access_token) {
+    console.log('Storing token in localStorage');
+    setToken(result.access_token);
+    
+    // Verify storage
+    const verifyToken = localStorage.getItem('access_token');
+    console.log('Token verification:', verifyToken ? 'STORED' : 'MISSING');
+  } else {
+    console.error('No access_token in response!');
+  }
+
   return {
     message: result.message,
     user: result.user,
