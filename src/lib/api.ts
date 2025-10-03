@@ -1,4 +1,4 @@
-// lib/api.ts - Typed API client with full backend integration
+// lib/api.ts - Token-based API client for production
 
 import type {
   User,
@@ -23,6 +23,26 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
+// Token management
+const getToken = (): string | null => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('access_token');
+  }
+  return null;
+};
+
+const setToken = (token: string): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('access_token', token);
+  }
+};
+
+const removeToken = (): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('access_token');
+  }
+};
+
 // Custom error class
 class APIException extends Error {
   constructor(public status: number, message: string) {
@@ -37,21 +57,30 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  const token = getToken();
 
-  const defaultOptions: RequestInit = {
-    credentials: 'include',
+  const defaultHeaders: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add Authorization header if token exists
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  const config: RequestInit = {
+    ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...defaultHeaders,
       ...options.headers,
     },
   };
-
-  const config = { ...defaultOptions, ...options };
 
   try {
     const response = await fetch(url, config);
 
     if (response.status === 401) {
+      removeToken();
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
@@ -81,16 +110,31 @@ export const authAPI = {
       body: JSON.stringify(data),
     }),
 
-  login: (data: LoginRequest): Promise<MessageResponse> =>
-    apiRequest('/login', {
+  login: async (data: LoginRequest): Promise<{ message: string; user: unknown }> => {
+    const response = await apiRequest<{
+      message: string;
+      access_token: string;
+      token_type: string;
+      user: unknown;
+    }>('/login', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    });
 
-  logout: (): Promise<MessageResponse> =>
-    apiRequest('/logout', {
-      method: 'POST',
-    }),
+    // Store token
+    if (response.access_token) {
+      setToken(response.access_token);
+    }
+
+    return {
+      message: response.message,
+      user: response.user,
+    };
+  },
+
+  logout: (): void => {
+    removeToken();
+  },
 
   createFirstAdmin: (data: CreateFirstAdminRequest): Promise<MessageResponse> =>
     apiRequest('/create-first-admin', {
