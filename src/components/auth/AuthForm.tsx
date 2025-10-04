@@ -17,36 +17,30 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [success, setSuccess] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
-  // In your AuthForm handleSubmit function
-const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  setError('');
-  setSuccess('');
-  setLoading(true);
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
 
-  try {
-    if (mode === 'login') {
-      // Clear any existing tokens before login
-      localStorage.removeItem('access_token');
-      
-      await authAPI.login({ email, password });
-      setSuccess('Login successful! Redirecting...');
-      
-      // Add a small delay to ensure token is stored and processed
-      await new Promise(resolve => setTimeout(resolve, 100));
-      router.push('/dashboard');
-    } else {
-      await authAPI.signup({ email, password });
-      setSuccess('Account created! Please login.');
-      setTimeout(() => router.push('/login'), 1500);
+    try {
+      if (mode === 'login') {
+        await authAPI.login({ email, password });
+        setSuccess('Login successful! Redirecting...');
+        // Redirect after login completes (includes the 100ms delay)
+        router.push('/dashboard');
+      } else {
+        await authAPI.signup({ email, password });
+        setSuccess('Account created! Please login.');
+        setTimeout(() => router.push('/login'), 1500);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="auth-container">

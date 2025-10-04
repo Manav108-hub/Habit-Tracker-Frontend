@@ -14,28 +14,24 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // dashboard page - ensure proper token handling
-useEffect(() => {
-  const checkAuthAndLoad = async () => {
-    // Wait for localStorage to be ready
-    await new Promise(resolve => setTimeout(resolve, 100));
+  useEffect(() => {
+    const checkAuthAndLoad = async () => {
+      // CRITICAL: Wait longer to ensure localStorage is readable
+      await new Promise(resolve => setTimeout(resolve, 250));
+      
+      const token = localStorage.getItem('access_token');
+      
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
+      
+      setIsAuthenticated(true);
+      await loadDashboardData();
+    };
     
-    const token = localStorage.getItem('access_token');
-    console.log('🏠 Dashboard token check:', token ? 'EXISTS' : 'MISSING');
-    
-    if (!token) {
-      console.log('❌ No token, redirecting to login...');
-      router.replace('/login');
-      return;
-    }
-    
-    console.log('✅ Token found, loading dashboard data...');
-    setIsAuthenticated(true);
-    await loadDashboardData();
-  };
-  
-  checkAuthAndLoad();
-}, [router]);
+    checkAuthAndLoad();
+  }, [router]);
 
   const loadDashboardData = async () => {
     try {

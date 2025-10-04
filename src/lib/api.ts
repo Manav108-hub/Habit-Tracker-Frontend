@@ -1,4 +1,4 @@
-// lib/api.ts - Fixed with better debugging
+// lib/api.ts - Final fixed version
 import type {
   User,
   Habit,
@@ -13,7 +13,6 @@ import type {
   CreateHabitRequest,
   CheckInRequest,
   MessageResponse,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   APIError,
   CreateFirstAdminRequest,
   AdminInviteRequest,
@@ -23,26 +22,23 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
-// Token management
+// Token management helpers
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('access_token');
-    console.log('🔐 getToken called, found:', token ? 'YES' : 'NO');
-    return token;
+    return localStorage.getItem('access_token');
   }
   return null;
 };
 
 const setToken = (token: string): void => {
   if (typeof window !== 'undefined') {
-    console.log('💾 Storing token in localStorage');
     localStorage.setItem('access_token', token);
   }
 };
 
 const removeToken = (): void => {
   if (typeof window !== 'undefined') {
-    console.log('🗑️ Removing token from localStorage');
     localStorage.removeItem('access_token');
   }
 };
@@ -62,28 +58,22 @@ async function apiRequest<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  console.log('🚀 Making API request to:', endpoint);
-  
-  // Build headers
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
-  // Add token if it exists
-  const token = getToken();
-  console.log('🔑 Token for request:', token ? `Bearer ${token.substring(0, 20)}...` : 'MISSING');
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // Read token directly from localStorage at request time
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
   }
 
-  // Merge with any headers from options
   const finalHeaders = {
     ...headers,
     ...(options.headers as Record<string, string>),
   };
-
-  console.log('📤 Request headers:', finalHeaders);
 
   const config: RequestInit = {
     ...options,
@@ -93,11 +83,7 @@ async function apiRequest<T>(
   try {
     const response = await fetch(url, config);
 
-    console.log('📥 Response status:', response.status, response.statusText);
-    console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
-
     if (response.status === 401) {
-      console.log('❌ 401 Unauthorized - removing token');
       removeToken();
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
@@ -106,23 +92,12 @@ async function apiRequest<T>(
     }
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.log('❌ API error response:', errorText);
-      let errorDetail = 'API request failed';
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorDetail = errorJson.detail || errorDetail;
-      } catch {
-        errorDetail = errorText || errorDetail;
-      }
-      throw new APIException(response.status, errorDetail);
+      const error: APIError = await response.json();
+      throw new APIException(response.status, error.detail || 'API request failed');
     }
 
-    const data = await response.json();
-    console.log('✅ API success response:', data);
-    return data;
+    return await response.json();
   } catch (error) {
-    console.error('💥 API Error:', error);
     if (error instanceof APIException) {
       throw error;
     }
@@ -138,45 +113,34 @@ export const authAPI = {
       body: JSON.stringify(data),
     }),
 
-  // In your authAPI login function
-login: async (data: LoginRequest): Promise<{ message: string; user: unknown }> => {
-  console.log('🔐 Starting login process...');
-  
-  // ✅ CRITICAL: Clear any existing token before login
-  removeToken();
-  console.log('🧹 Cleared any existing token');
-  
-  const response = await apiRequest<{
-    message: string;
-    access_token: string;
-    token_type: string;
-    user: unknown;
-  }>('/login', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-
-  // Store the NEW token from response
-  if (response.access_token) {
-    console.log('✅ Login successful, storing NEW token...');
-    setToken(response.access_token);
+  login: async (data: LoginRequest): Promise<{ message: string; user: unknown }> => {
+    // Clear any existing token first
+    removeToken();
     
-    // Verify token was stored
-    const verifyToken = localStorage.getItem('access_token');
-    console.log('🔍 Token storage verification:', verifyToken ? 'SUCCESS' : 'FAILED');
-    console.log('🔍 Stored token preview:', verifyToken ? `Bearer ${verifyToken.substring(0, 20)}...` : 'MISSING');
-  } else {
-    console.error('❌ No access_token in login response!');
-  }
+    const response = await apiRequest<{
+      message: string;
+      access_token: string;
+      token_type: string;
+      user: unknown;
+    }>('/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
 
-  return {
-    message: response.message,
-    user: response.user,
-  };
-},
+    // Store token and wait for it to be written
+    if (response.access_token) {
+      setToken(response.access_token);
+      // CRITICAL: Wait for localStorage write to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return {
+      message: response.message,
+      user: response.user,
+    };
+  },
 
   logout: (): void => {
-    console.log('👋 Logging out...');
     removeToken();
   },
 
@@ -186,13 +150,10 @@ login: async (data: LoginRequest): Promise<{ message: string; user: unknown }> =
       body: JSON.stringify(data),
     }),
 
-  getCurrentUser: (): Promise<User> => {
-    console.log('👤 Getting current user...');
-    return apiRequest('/me');
-  },
+  getCurrentUser: (): Promise<User> => apiRequest('/me'),
 };
 
-// ... rest of your API functions remain the same
+// Habit APIs
 export const habitAPI = {
   getAllHabits: (): Promise<Habit[]> => apiRequest('/habits'),
   createHabit: (data: CreateHabitRequest): Promise<Habit> =>
@@ -207,16 +168,19 @@ export const habitAPI = {
     }),
 };
 
+// Progress APIs
 export const progressAPI = {
   getDailyProgress: (): Promise<Progress> => apiRequest('/progress'),
   getWeeklyProgress: (): Promise<WeeklyProgress> => apiRequest('/progress/weekly'),
 };
 
+// Gamification APIs
 export const gamificationAPI = {
   getUserStats: (): Promise<UserStats> => apiRequest('/stats'),
   getBadges: (): Promise<Badge[]> => apiRequest('/badges'),
 };
 
+// AI Recommendation APIs
 export const recommendationAPI = {
   generateRecommendation: (recommendationType: 'motivation' | 'improvement' | 'habit_suggestion'): Promise<AIRecommendation> =>
     apiRequest('/recommendations/generate', {
@@ -232,6 +196,7 @@ export const recommendationAPI = {
     }),
 };
 
+// Admin APIs
 export const adminAPI = {
   getAllUsers: (): Promise<User[]> => apiRequest('/admin/users'),
   createUser: (email: string, password: string, role: string = 'user'): Promise<MessageResponse> =>
