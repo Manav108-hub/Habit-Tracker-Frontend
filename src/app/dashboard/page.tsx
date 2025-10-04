@@ -12,13 +12,19 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [recentHabits, setRecentHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
+  // First useEffect: Just mark component as mounted
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Second useEffect: Only runs after component is mounted (client-side)
+  useEffect(() => {
+    if (!mounted) return;
+
     const checkAuthAndLoad = async () => {
-      // CRITICAL: Wait longer to ensure localStorage is readable
-      await new Promise(resolve => setTimeout(resolve, 250));
-      
+      // Now we're definitely client-side
       const token = localStorage.getItem('access_token');
       
       if (!token) {
@@ -26,32 +32,31 @@ export default function DashboardPage() {
         return;
       }
       
-      setIsAuthenticated(true);
-      await loadDashboardData();
+      // Load data
+      try {
+        const [progressData, statsData, habitsData] = await Promise.all([
+          progressAPI.getDailyProgress(),
+          gamificationAPI.getUserStats(),
+          habitAPI.getAllHabits(),
+        ]);
+        
+        setProgress(progressData);
+        setStats(statsData);
+        setRecentHabits(habitsData.slice(0, 3));
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        // If API calls fail, redirect to login
+        router.replace('/login');
+      } finally {
+        setLoading(false);
+      }
     };
     
     checkAuthAndLoad();
-  }, [router]);
+  }, [mounted, router]);
 
-  const loadDashboardData = async () => {
-    try {
-      const [progressData, statsData, habitsData] = await Promise.all([
-        progressAPI.getDailyProgress(),
-        gamificationAPI.getUserStats(),
-        habitAPI.getAllHabits(),
-      ]);
-      
-      setProgress(progressData);
-      setStats(statsData);
-      setRecentHabits(habitsData.slice(0, 3));
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!isAuthenticated || loading) {
+  // Show loading while mounting or fetching data
+  if (!mounted || loading) {
     return (
       <div className="flex-center" style={{ minHeight: '50vh' }}>
         <div className="spinner" style={{ width: '2rem', height: '2rem' }}></div>
