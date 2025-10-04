@@ -1,9 +1,9 @@
-// app/dashboard/layout.tsx - Fixed Dashboard Layout
 'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { authAPI } from '@/lib/api';
 
 interface User {
   id: number;
@@ -22,48 +22,46 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-
+  // First useEffect: Mark as mounted
   useEffect(() => {
-    checkAuth();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setMounted(true);
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      const response = await fetch(`${API_URL}/me`, {
-        credentials: 'include',
-      });
+  // Second useEffect: Check auth only after mounted
+  useEffect(() => {
+    if (!mounted) return;
 
-      if (!response.ok) {
+    const checkAuth = async () => {
+      try {
+        // Check if token exists first
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+          router.push('/login');
+          return;
+        }
+
+        // Use authAPI.getCurrentUser() which includes the token
+        const userData = await authAPI.getCurrentUser();
+        setUser(userData);
+      } catch (error) {
+        console.error('Auth check failed:', error);
         router.push('/login');
-        return;
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const userData = await response.json();
-      setUser(userData);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      router.push('/login');
-    } finally {
-      setLoading(false);
-    }
+    checkAuth();
+  }, [mounted, router]);
+
+  const handleLogout = () => {
+    authAPI.logout(); // This removes token from localStorage
+    router.push('/');
   };
 
-  const handleLogout = async () => {
-    try {
-      await fetch(`${API_URL}/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      router.push('/');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
-  };
-
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div style={{ 
         minHeight: '100vh', 

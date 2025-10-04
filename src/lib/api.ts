@@ -52,11 +52,16 @@ class APIException extends Error {
 }
 
 // Generic API request handler
+// lib/api.ts - Diagnostic version
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  
+  console.log('🔧 API Request Debug:');
+  console.log('  Endpoint:', endpoint);
+  console.log('  Window exists:', typeof window !== 'undefined');
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -65,10 +70,20 @@ async function apiRequest<T>(
   // Read token directly from localStorage at request time
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token');
+    console.log('  Token found:', token ? 'YES' : 'NO');
+    console.log('  Token preview:', token ? `${token.substring(0, 30)}...` : 'N/A');
+    
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+      console.log('  ✅ Authorization header SET');
+    } else {
+      console.log('  ❌ No token - Authorization header NOT SET');
     }
+  } else {
+    console.log('  ❌ Window undefined - running on server');
   }
+
+  console.log('  Final headers:', headers);
 
   const finalHeaders = {
     ...headers,
@@ -82,8 +97,10 @@ async function apiRequest<T>(
 
   try {
     const response = await fetch(url, config);
+    console.log('  Response status:', response.status);
 
     if (response.status === 401) {
+      console.log('  ❌ 401 Unauthorized - removing token');
       removeToken();
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
@@ -98,6 +115,7 @@ async function apiRequest<T>(
 
     return await response.json();
   } catch (error) {
+    console.error('  💥 Request failed:', error);
     if (error instanceof APIException) {
       throw error;
     }
