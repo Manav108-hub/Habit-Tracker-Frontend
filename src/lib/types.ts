@@ -8,6 +8,7 @@ export interface User {
   level: number;
   created_at: string;
   updated_at?: string;
+  is_active:boolean
 }
 
 export interface Habit {

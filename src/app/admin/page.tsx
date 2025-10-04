@@ -1,18 +1,19 @@
-// app/admin/page.tsx - Admin Panel with CSS Classes
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { authAPI, adminAPI  } from '@/lib/api';
+import type { User } from '@/lib/types';
 
-interface User {
-  id: number;
-  email: string;
-  role: string;
-  total_points: number;
-  level: number;
-  created_at: string;
-  is_active: boolean;
-}
+// interface User {
+//   id: number;
+//   email: string;
+//   role: string;
+//   total_points: number;
+//   level: number;
+//   created_at: string;
+//   is_active: boolean;
+// }
 
 interface Analytics {
   total_users: number;
@@ -38,6 +39,7 @@ export default function AdminPanel() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [invites, setInvites] = useState<AdminInvite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'invites'>('overview');
   
   const [inviteEmail, setInviteEmail] = useState('');
@@ -45,25 +47,27 @@ export default function AdminPanel() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
+    if (!mounted) return;
     checkAdminAccess();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mounted]);
 
   const checkAdminAccess = async () => {
     try {
-      const response = await fetch(`${API_URL}/me`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
+      // Check token exists
+      const token = localStorage.getItem('access_token');
+      if (!token) {
         router.push('/login');
         return;
       }
 
-      const user = await response.json();
+      // Use authAPI which includes token
+      const user = await authAPI.getCurrentUser();
       
       if (user.role !== 'admin' && user.role !== 'super_admin') {
         router.push('/dashboard');
@@ -71,41 +75,29 @@ export default function AdminPanel() {
       }
 
       setCurrentUser(user);
-      loadAdminData();
+      loadAdminData(user);
     } catch (error) {
       console.error('Failed to check admin access:', error);
       router.push('/login');
     }
   };
 
-  const loadAdminData = async () => {
+  const loadAdminData = async (user: User) => {
     try {
       setLoading(true);
       
-      const analyticsRes = await fetch(`${API_URL}/admin/analytics`, {
-        credentials: 'include',
-      });
-      if (analyticsRes.ok) {
-        const analyticsData = await analyticsRes.json();
-        setAnalytics(analyticsData);
-      }
+      // Use adminAPI which includes token
+      const [analyticsData, usersData] = await Promise.all([
+        adminAPI.getAnalytics(),
+        adminAPI.getAllUsers(),
+      ]);
 
-      const usersRes = await fetch(`${API_URL}/admin/users`, {
-        credentials: 'include',
-      });
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        setUsers(usersData);
-      }
+      setAnalytics(analyticsData);
+      setUsers(usersData);
 
-      if (currentUser?.role === 'super_admin') {
-        const invitesRes = await fetch(`${API_URL}/admin/invites`, {
-          credentials: 'include',
-        });
-        if (invitesRes.ok) {
-          const invitesData = await invitesRes.json();
-          setInvites(invitesData);
-        }
+      if (user.role === 'super_admin') {
+        const invitesData = await adminAPI.getInvites();
+        setInvites(invitesData);
       }
 
     } catch (error) {
@@ -121,31 +113,18 @@ export default function AdminPanel() {
     setMessage(null);
 
     try {
-      const response = await fetch(`${API_URL}/admin/invite`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: inviteEmail,
-          admin_creation_secret: adminSecret,
-        }),
+      await adminAPI.inviteAdmin({
+        email: inviteEmail,
+        admin_creation_secret: adminSecret,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: `Invitation sent to ${inviteEmail}` });
-        setInviteEmail('');
-        setAdminSecret('');
-        loadAdminData();
-      } else {
-        setMessage({ type: 'error', text: data.detail || 'Failed to send invitation' });
-      }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      setMessage({ type: 'success', text: `Invitation sent to ${inviteEmail}` });
+      setInviteEmail('');
+      setAdminSecret('');
+      if (currentUser) loadAdminData(currentUser);
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to send invitation' });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send invitation';
+      setMessage({ type: 'error', text: errorMessage });
     } finally {
       setInviteLoading(false);
     }
@@ -155,24 +134,16 @@ export default function AdminPanel() {
     if (!confirm('Are you sure you want to revoke this invitation?')) return;
 
     try {
-      const response = await fetch(`${API_URL}/admin/invites/${inviteId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Invitation revoked' });
-        loadAdminData();
-      } else {
-        setMessage({ type: 'error', text: 'Failed to revoke invitation' });
-      }
+      await adminAPI.revokeInvite(inviteId);
+      setMessage({ type: 'success', text: 'Invitation revoked' });
+      if (currentUser) loadAdminData(currentUser);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to revoke invitation' });
     }
   };
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="admin-loading">
         <div className="admin-spinner"></div>
